@@ -1,7 +1,3 @@
-## 1.4.0-SNAPSHOT / 2021-05-31
+## 1.3.1-STRIMZI / 2021-06-11
 
-* [CHANGE] Concurrency fix ...
-
-## 1.4.1-SNAPSHOT / 2021-06-03
-
-* [CHANGE] Merge fork1
+* [CHANGE] rebased fork2 against upstream master
