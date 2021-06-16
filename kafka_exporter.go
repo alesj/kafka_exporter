@@ -645,7 +645,7 @@ func main() {
 	toFlag("concurrent.enable", "If true, all scrapes will trigger kafka operations otherwise, they will share results. WARN: This should be disabled on large clusters").Default("false").BoolVar(&opts.allowConcurrent)
 	toFlag("topic.workers", "Number of topic workers").Default("100").IntVar(&opts.topicWorkers)
 	toFlag("verbosity", "Verbosity log level").Default("0").IntVar(&opts.verbosityLogLevel)
-	toFlag("log.level", "Log level").Default("0").StringVar(&opts.logLevel) // TODO
+	flag.CommandLine.String("log.level", "", "Log level") // workaround duplicate flag or no flag ?!
 
 	plConfig := plog.Config{}
 	plogflag.AddFlags(kingpin.CommandLine, &plConfig)
