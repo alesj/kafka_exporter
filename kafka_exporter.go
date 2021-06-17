@@ -66,6 +66,7 @@ type Exporter struct {
 	sgWaitCh                chan struct{}
 	sgChans                 []chan<- prometheus.Metric
 	consumerGroupFetchAll   bool
+	legacyPartitions        bool
 }
 
 type kafkaOpts struct {
@@ -88,6 +89,7 @@ type kafkaOpts struct {
 	topicWorkers             int
 	allowConcurrent          bool
 	logLevel                 string
+	legacyPartitions         bool
 }
 
 // CanReadCertAndKey returns true if the certificate and key files already exists,
@@ -233,6 +235,7 @@ func NewExporter(opts kafkaOpts, topicFilter string, groupFilter string) (*Expor
 		sgWaitCh:                nil,
 		sgChans:                 []chan<- prometheus.Metric{},
 		consumerGroupFetchAll:   config.Version.IsAtLeast(sarama.V2_0_0_0),
+		legacyPartitions:        opts.legacyPartitions,
 	}, nil
 }
 
@@ -514,15 +517,23 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 		}
 		for _, group := range describeGroups.Groups {
 			offsetFetchRequest := sarama.OffsetFetchRequest{ConsumerGroup: group.GroupId, Version: 1}
-			for _, member := range group.Members {
-				assignment, err := member.GetMemberAssignment()
-				if err != nil {
-					Errorf("Cannot get GetMemberAssignment of group member %v : %v", member, err)
-					return
-				}
-				for topic, partions := range assignment.Topics {
-					for _, partition := range partions {
+			if e.legacyPartitions {
+				for topic, partitions := range offset {
+					for partition := range partitions {
 						offsetFetchRequest.AddPartition(topic, partition)
+					}
+				}
+			} else {
+				for _, member := range group.Members {
+					assignment, err := member.GetMemberAssignment()
+					if err != nil {
+						Errorf("Cannot get GetMemberAssignment of group member %v : %v", member, err)
+						return
+					}
+					for topic, partions := range assignment.Topics {
+						for _, partition := range partions {
+							offsetFetchRequest.AddPartition(topic, partition)
+						}
 					}
 				}
 			}
@@ -640,7 +651,7 @@ func main() {
 	toFlag("refresh.metadata", "Metadata refresh interval").Default("1m").StringVar(&opts.metadataRefreshInterval)
 	toFlag("concurrent.enable", "If true, all scrapes will trigger kafka operations otherwise, they will share results. WARN: This should be disabled on large clusters").Default("false").BoolVar(&opts.allowConcurrent)
 	toFlag("topic.workers", "Number of topic workers").Default("100").IntVar(&opts.topicWorkers)
-	toFlag("log.level", "Log level").Default("0").StringVar(&opts.logLevel)
+	toFlag("legacy.partitions", "Do we use legacy partitions fetch").Default("false").BoolVar(&opts.legacyPartitions)
 
 	plConfig := plog.Config{}
 	plogflag.AddFlags(kingpin.CommandLine, &plConfig)
